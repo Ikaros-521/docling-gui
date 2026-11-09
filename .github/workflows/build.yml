@@ -33,6 +33,7 @@ jobs:
       # 先装 CPU 版 torch/torchaudio：否则 Linux 上会拉 CUDA 版（多下几个 GB）。
       # macOS 的官方 torch 本身就是 CPU/MPS 构建，无需专门处理。
       - name: Install dependencies
+        shell: bash # windows-latest 的默认 shell 是 PowerShell，跑不了 bash 的 if 语法
         run: |
           python -m pip install --upgrade pip
           if [ "$RUNNER_OS" != "macOS" ]; then
