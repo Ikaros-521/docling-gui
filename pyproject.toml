@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docling-gui"
-version = "0.3.0"
+version = "0.4.0"
 description = "递归批量转换 docling 支持的全部文档格式为 Markdown/HTML/JSON/DocTags/纯文本，跨平台 GUI"
 readme = "README.md"
 requires-python = ">=3.10"

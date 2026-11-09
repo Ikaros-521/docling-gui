@@ -1,24 +1,33 @@
 # Docling GUI
 
+[![Build & Release](https://github.com/Ikaros-521/docling-gui/actions/workflows/build.yml/badge.svg)](https://github.com/Ikaros-521/docling-gui/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/Ikaros-521/docling-gui)](https://github.com/Ikaros-521/docling-gui/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](pyproject.toml)
+
+[English](README.en.md) | 简体中文
+
 递归遍历文件夹（含所有子文件夹），把 **docling 支持的全部格式** 批量转换为
-**同路径同名** 的目标格式。基于 [docling](https://github.com/docling-project/docling)
-（IBM 开源文档解析引擎），界面使用 [QFluentWidgets](https://qfluentwidgets.com/)（PySide6），
-通过 GitHub Actions 自动打包 Windows / macOS / Linux 三平台可执行文件。
+**同路径同名**（或自定义目录镜像结构）的目标格式。基于
+[docling](https://github.com/docling-project/docling)（IBM 开源文档解析引擎），
+界面使用 [QFluentWidgets](https://qfluentwidgets.com/)（PySide6 / Fluent Design），
+GitHub Actions 自动打包 Windows / macOS / Linux 三平台可执行文件。
+
+![程序截图](docs/main-window.png)
 
 ## ✨ 特性
 
-- 📂 **递归批量**：选定根目录后递归处理所有子文件夹，输出与源文件同路径同名
-- 📄 **单文件或文件夹**：输入可以是单个文件，也可以是整个文件夹
+- 📂 **递归批量 / 单文件**：输入可以是文件夹（递归处理所有子文件夹）或单个文件
 - 🎯 **输出目录可选**：留空 = 与源文件同路径；填写 = 按原目录结构镜像输出（图片随输出文件存放）
-- ✅ **输入格式勾选**：按 docling 输入格式逐项勾选要转换哪些文件（界面 37 项，动态跟随官方能力）
-- 🔍 **输入格式跟随官方能力**：扫描范围动态取自已安装 docling 的格式映射，支持
-  PDF、Office（含旧版 .doc/.xls/.ppt，需 LibreOffice）、HTML、Markdown、图片、
-  音频、EPUB、CSV、XML 系列等（详见下表）
+- ✅ **输入格式勾选**：37 种输入格式逐项勾选（含旧版 Office、音频、Email 等全能力），动态跟随已安装 docling
+- 🌐 **中英文界面**：设置页一键切换，即时生效；首次启动跟随系统语言
+- 🔄 **检查更新**：设置页一键查询 GitHub Releases 最新版本
 - 📤 **五种输出**：Markdown / HTML / JSON（DoclingDocument 无损）/ DocTags XML / 纯文本
 - 🖼️ **图片导出**：md/html/json 输出时内嵌图片自动导出到 `<名称>_images/`，相对链接引用
 - ⏸️ **可中断**：后台线程运行，随时停止；默认跳过已存在的输出，可断点续转
-- 🎨 **Fluent 风格界面**：QFluentWidgets 组件、拖拽文件/文件夹、实时日志与进度
-- 💻 **双模式**：GUI + 命令行（`--list-formats` 可查看当前支持的输入格式）
+- 💻 **双模式**：GUI + 命令行；**测试覆盖**：核心逻辑单元测试（`pytest tests/`）
+
+![设置页](docs/settings.png)
 
 ## 📥 支持的输入格式（docling 官方清单）
 
@@ -32,12 +41,12 @@
 | HTML / XHTML / MHTML | 无 |
 | Markdown / AsciiDoc / LaTeX / CSV / 纯文本 | 无 |
 | PNG / JPEG / TIFF / BMP / WEBP / GIF | 首次转换自动下载模型（OCR） |
-| WAV / MP3 / M4A / AAC / OGG / FLAC（音频） | 需 audio/asr 依赖（本仓库已带），首次下载 ASR 模型 |
+| WAV / MP3 / M4A / AAC / OGG / FLAC（音频） | 首次下载 ASR 模型 |
 | MP4 / AVI / MOV / MKV / WEBM（视频，仅取音轨转写） | 同上，另需系统 ffmpeg |
 | Email（.eml / .msg）、iCalendar、WebVTT、BoxNote、USPTO/JATS/XBRL XML、DocLang XML/archive 等 | 无 |
 | Pages / Numbers / Keynote | 需 iWork 扩展（默认未启用） |
 
-精确清单以本机为准：`docling-gui --list-formats`。
+精确清单以本机为准：`docling-gui --list-formats`（GUI 的格式勾选面板亦动态生成）。
 
 ## 📤 输出格式
 
@@ -84,10 +93,8 @@
 # 递归转换整个文件夹（默认输出 Markdown，与源文件同路径）
 docling-gui D:\docs
 
-# 转换单个文件
+# 转换单个文件 / 输出到指定目录（按原目录结构镜像）
 docling-gui D:\docs\report.docx
-
-# 输出到指定目录（按原目录结构镜像）
 docling-gui D:\docs --out E:\md_out
 
 # 只转换指定格式（InputFormat 名，--list-formats 可查）
@@ -96,7 +103,7 @@ docling-gui D:\docs --formats pdf,docx,image
 # 常用参数
 --to md|html|json|doctags|txt   输出格式（默认 md）
 --out DIR                       输出目录（留空 = 与源文件同路径）
---formats NAME[,NAME...]        只转换指定输入格式（如 pdf,docx,image）
+--formats NAME[,NAME...]        只转换指定输入格式
 --overwrite                     覆盖已存在的输出（默认跳过）
 --no-images                     不导出内嵌图片
 --flat                          不递归子文件夹
@@ -124,6 +131,10 @@ python -m venv .venv
 
 python -m docling_gui                 # 启动 GUI
 python -m docling_gui D:\docs --cli   # 命令行模式
+
+# 单元测试（不依赖 docling 模型，秒级）
+pip install pytest
+pytest tests/ -v
 ```
 
 生成多格式测试样例并自测：
@@ -139,7 +150,7 @@ python -m docling_gui tests/_sandbox --cli
 本仓库带 [GitHub Actions 工作流](.github/workflows/build.yml)（`docling-gui.spec` 为
 PyInstaller 配置）。两种触发方式：
 
-- **推送版本标签**：`git tag v0.2.0 && git push origin v0.2.0`，构建完成后自动发布 Release
+- **推送版本标签**：`git tag v0.4.0 && git push origin v0.4.0`，构建完成后自动发布 Release
 - **手动**：Actions 页面 → Build & Release → Run workflow（产物在 Actions Artifacts）
 
 本地打包：
@@ -159,11 +170,21 @@ pyinstaller docling-gui.spec --noconfirm
 
 ```
 ├── src/docling_gui/
-│   ├── core.py        # 动态格式发现 + 递归扫描 + docling 转换（GUI/CLI 共用）
-│   ├── app.py         # QFluentWidgets 图形界面（后台线程 + 信号更新）
-│   └── __main__.py    # 入口：python -m docling_gui
-├── tests/             # 测试样例生成器
-├── docling-gui.spec   # PyInstaller 打包配置（三平台共用）
+│   ├── core/               # 域逻辑（无 GUI 依赖，GUI/CLI 共用）
+│   │   ├── formats.py      #   输出格式清单 + 输入格式动态发现
+│   │   ├── scanner.py      #   文件扫描与过滤（递归/格式勾选/跳过规则）
+│   │   └── converter.py    #   BatchConverter（同路径/镜像输出、图片导出）
+│   ├── gui/                # 界面层（PySide6 + QFluentWidgets）
+│   │   ├── main_window.py  #   主窗口（转换页，中英文热切换）
+│   │   ├── settings_page.py#   设置页（语言 / 关于 / 检查更新）
+│   │   ├── workers.py      #   后台线程（转换 / 格式加载 / 更新检查）
+│   │   └── bootstrap.py    #   run_gui()
+│   ├── cli.py              # 命令行入口（argparse）
+│   ├── i18n.py             # 中英文词表与取词（纯 Python）
+│   └── __main__.py         # python -m 入口
+├── tests/                  # 单元测试 + 测试样例生成器
+├── docs/                   # 截图等文档资源
+├── docling-gui.spec        # PyInstaller 打包配置（三平台共用）
 └── .github/workflows/build.yml  # 三平台 CI 打包 + Release
 ```
 
