@@ -7,14 +7,24 @@
 
 English | [简体中文](README.md)
 
-Recursively batch-convert **every format docling supports** (all subfolders included)
-into a target format — saved next to each source file, or mirrored into a custom
-output directory. Built on [docling](https://github.com/docling-project/docling)
-(IBM's open-source document parsing engine) with a
-[QFluentWidgets](https://qfluentwidgets.com/) UI (PySide6 / Fluent Design).
-GitHub Actions builds ready-to-run packages for Windows / macOS / Linux.
+**Docling GUI is a free, open-source (MIT) desktop app for batch document conversion.**
+It is a ready-to-use graphical interface for [docling](https://github.com/docling-project/docling)
+(IBM's open-source document parsing engine): recursively convert **PDF, Word, Excel,
+PowerPoint, images, audio — all 37 format families / 88 extensions docling supports —
+into Markdown / HTML / JSON / DocTags / plain text**. Windows / macOS / Linux.
+**100% local and offline, no code required — your documents never leave your machine.**
+
+> In one line: the GUI for docling. Batch-convert PDF to Markdown without writing Python.
 
 ![Screenshot](docs/main-window.png)
+
+## 🎯 Use cases
+
+- **Knowledge base / note migration**: batch-convert PDF, Word and web pages to Markdown for Obsidian, Logseq, Notion, etc.
+- **RAG / LLM data preparation**: Markdown, lossless JSON (DoclingDocument) or DocTags output for chunking and retrieval
+- **Office archiving**: recursively process years of legacy .doc / .xls / .ppt (with LibreOffice) into one uniform output
+- **Scanned-document OCR**: images and scanned PDFs to searchable text (docling's built-in OCR)
+- **Audio/video transcription**: audio files and video sound tracks to text (ASR)
 
 ## ✨ Features
 
@@ -99,6 +109,45 @@ docling-gui D:\docs --formats pdf,docx,image
 --version
 ```
 
+## ❓ FAQ
+
+**Q: What is Docling GUI? How does it relate to docling?**
+A: docling is IBM's open-source document parsing engine (Python library / CLI). Docling GUI
+is its desktop GUI and batch-conversion wrapper: identical parsing quality, plus recursive
+batch jobs, per-format selection, image export, pause/resume, a Chinese/English UI and
+prebuilt packages for three platforms.
+
+**Q: Do I need Python or any coding?**
+A: No. Download a package from Releases, unzip and run. Only a source checkout needs Python 3.10+.
+
+**Q: Are my documents uploaded to the cloud?**
+A: No. All parsing runs locally. docling models are downloaded once on first use (cached in
+`~/.cache/docling`); after that the app works fully offline.
+
+**Q: How do I batch-convert PDFs to Markdown for Obsidian?**
+A: Pick the folder containing the PDFs → output format Markdown → optional output directory
+(mirrors the source tree) → Start. Images are exported to `<name>_images/` with relative
+links; move them together with the .md files into your vault.
+
+**Q: Why is the first PDF / image conversion slow?**
+A: Layout/table/OCR models (hundreds of MB) are downloading — once. Later conversions use the local cache.
+
+**Q: Can I use it commercially?**
+A: Yes. MIT licensed — free for personal and commercial use.
+
+## 🆚 How it compares
+
+| Tool | Parsing engine | Interface | Recursive batch |
+|---|---|---|---|
+| **Docling GUI** | docling | Desktop GUI + CLI | Built-in, resumable |
+| docling (upstream) | docling | Python API / CLI | Roll your own loop |
+| Marker | marker | CLI / hosted web | Script it yourself |
+| MinerU | MinerU | CLI / online demo | Script it yourself |
+| Pandoc | rule-based | CLI | No OCR / layout analysis |
+
+If you want docling's parsing quality (layout, tables, OCR, multilingual) without writing
+code, Docling GUI is the shortest path.
+
 ## ⚠️ Known limitations
 
 - First PDF/image/audio conversion downloads models to `~/.cache/docling` (hundreds of MB, once)
@@ -152,6 +201,11 @@ hiddenimport (`docling.models.plugins.defaults`); qfluentwidgets resources via
 ├── docling-gui.spec        # PyInstaller config (all platforms)
 └── .github/workflows/build.yml
 ```
+
+## 🙏 Acknowledgments
+
+- [docling](https://github.com/docling-project/docling) — IBM's open-source document parsing engine; all parsing capability comes from it
+- [QFluentWidgets](https://qfluentwidgets.com/) — Fluent Design PySide6 component library
 
 ## 📄 License
 

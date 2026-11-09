@@ -7,13 +7,23 @@
 
 [English](README.en.md) | 简体中文
 
-递归遍历文件夹（含所有子文件夹），把 **docling 支持的全部格式** 批量转换为
-**同路径同名**（或自定义目录镜像结构）的目标格式。基于
-[docling](https://github.com/docling-project/docling)（IBM 开源文档解析引擎），
-界面使用 [QFluentWidgets](https://qfluentwidgets.com/)（PySide6 / Fluent Design），
-GitHub Actions 自动打包 Windows / macOS / Linux 三平台可执行文件。
+**Docling GUI 是一款免费开源（MIT）的批量文档转换桌面应用**，为 IBM 开源文档解析引擎
+[docling](https://github.com/docling-project/docling) 提供开箱即用的图形界面：
+递归地把 **PDF、Word、Excel、PPT、图片、音频等 37 类格式 / 88 种扩展名**（docling 支持的全部格式）
+批量转换为 **Markdown / HTML / JSON / DocTags / 纯文本**。
+支持 Windows / macOS / Linux，**完全本地离线转换、无需编写代码，文档不出本机**。
+
+> 一句话：想用 docling 做 PDF 转 Markdown / 批量文档转换，又不想写 Python——这就是现成的 GUI。
 
 ![程序截图](docs/main-window.png)
+
+## 🎯 适用场景
+
+- **知识库 / 笔记迁移**：批量把 PDF、Word、网页转成 Markdown，导入 Obsidian、Logseq、Notion 等
+- **RAG / 大模型数据预处理**：输出 Markdown、无损 JSON（DoclingDocument）或 DocTags，供切块与检索
+- **Office 文档归档**：递归处理多年积累的 .doc / .xls / .ppt（需 LibreOffice），统一输出
+- **扫描件 OCR**：图片、扫描版 PDF 转可检索文本（docling 内置 OCR）
+- **音视频转写**：音频与视频音轨转文字（ASR）
 
 ## ✨ 特性
 
@@ -111,6 +121,42 @@ docling-gui D:\docs --formats pdf,docx,image
 --version                       显示版本
 ```
 
+## ❓ 常见问题（FAQ）
+
+**Q：Docling GUI 是什么？和 docling 什么关系？**
+A：docling 是 IBM 开源的文档解析引擎（Python 库 / CLI）；Docling GUI 是它的桌面图形界面 +
+批量转换封装——解析质量与 docling 完全一致，本项目额外提供递归批量、格式勾选、图片导出、
+断点续转、中英文界面和三平台免安装包。
+
+**Q：需要安装 Python 或写代码吗？**
+A：不需要。从 Releases 下载压缩包，解压即用。源码运行才需要 Python 3.10+。
+
+**Q：文档会被上传到云端吗？**
+A：不会。所有解析都在本地完成；仅首次使用时联网下载 docling 模型（缓存于
+`~/.cache/docling`），之后可完全离线使用。
+
+**Q：如何批量把 PDF 转成 Markdown 导入 Obsidian？**
+A：选择 PDF 所在文件夹 → 输出格式选 Markdown → 可指定输出目录（按原目录结构镜像）→
+开始转换。图片导出到 `<名称>_images/` 并以相对链接引用，连同 md 文件一起移入笔记库即可。
+
+**Q：为什么第一次转换 PDF / 图片特别慢？**
+A：首次会下载布局 / 表格 / OCR 模型（数百 MB），仅一次；之后转换走本地缓存。
+
+**Q：可以商用吗？**
+A：可以。MIT 许可证，个人与商业使用均免费。
+
+## 🆚 与同类工具的关系
+
+| 方案 | 解析引擎 | 使用方式 | 递归批量 |
+|---|---|---|---|
+| **Docling GUI** | docling | 桌面 GUI / 一行命令 | 内置，可断点续转 |
+| docling 官方 | docling | Python API / CLI | 需自行写循环 |
+| Marker | marker | CLI / 在线服务 | 需自行脚本 |
+| MinerU | MinerU | CLI / 在线演示 | 需自行脚本 |
+| Pandoc | 规则转换 | CLI | 无 OCR / 布局识别 |
+
+认可 docling 引擎的解析质量（布局、表格、OCR、多语言）又不想写代码，Docling GUI 是最短路径。
+
 ## ⚠️ 已知限制
 
 - **首次转换 PDF / 图片 / 音频会自动下载模型**到 `~/.cache/docling`（数百 MB，仅一次）
@@ -187,6 +233,11 @@ pyinstaller docling-gui.spec --noconfirm
 ├── docling-gui.spec        # PyInstaller 打包配置（三平台共用）
 └── .github/workflows/build.yml  # 三平台 CI 打包 + Release
 ```
+
+## 🙏 致谢
+
+- [docling](https://github.com/docling-project/docling) — IBM 开源文档解析引擎，本项目的全部解析能力来自它
+- [QFluentWidgets](https://qfluentwidgets.com/) — Fluent Design 风格的 PySide6 组件库
 
 ## 📄 许可证
 
