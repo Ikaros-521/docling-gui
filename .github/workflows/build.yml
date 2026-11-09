@@ -66,6 +66,8 @@ jobs:
           python tests/make_sample.py tests/_sandbox/sample.docx
           "$BIN" --cli tests/_sandbox
           test -f tests/_sandbox/sample.md
+          "$BIN" --cli --out tests/_sandbox/out2 tests/_sandbox/sample.docx
+          test -f tests/_sandbox/out2/sample.md
           echo "SMOKE OK: $BIN"
 
       - name: Zip artifact

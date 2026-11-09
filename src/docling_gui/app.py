@@ -6,9 +6,16 @@ import sys
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QThread, Signal
+from PySide6.QtCore import QSettings, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import QApplication, QHBoxLayout, QPlainTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QHBoxLayout,
+    QPlainTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
@@ -17,12 +24,14 @@ from qfluentwidgets import (
     ComboBox,
     FluentIcon,
     FluentWindow,
+    FlowLayout,
     InfoBar,
     IndeterminateProgressBar,
     LineEdit,
     PrimaryPushButton,
     ProgressBar,
     PushButton,
+    ScrollArea,
     TitleLabel,
 )
 
@@ -39,18 +48,22 @@ class ConvertWorker(QThread):
 
     def __init__(
         self,
-        folder: str,
+        path: str,
         out_format: str,
         overwrite: bool,
         export_images: bool,
         recursive: bool,
+        allowed_exts: frozenset[str] | None,
+        out_dir: str,
     ):
         super().__init__()
-        self.folder = folder
+        self.path = path
         self.out_format = out_format
         self.overwrite = overwrite
         self.export_images = export_images
         self.recursive = recursive
+        self.allowed_exts = allowed_exts
+        self.out_dir = out_dir
         self._stop_event = threading.Event()
 
     def stop(self) -> None:
@@ -64,25 +77,41 @@ class ConvertWorker(QThread):
             overwrite=self.overwrite,
             export_images=self.export_images,
             recursive=self.recursive,
+            allowed_exts=self.allowed_exts,
+            out_dir=self.out_dir or None,
             log=self.log_line.emit,
             progress=self.progress.emit,
             should_stop=self._stop_event.is_set,
         )
         try:
-            summary = converter.convert_tree(self.folder)
+            summary = converter.convert_tree(self.path)
             self.done.emit(summary.ok, summary.skipped, summary.failed, summary.stopped)
         except Exception as exc:  # 致命错误也要反馈到界面
             self.log_line.emit(f"[错误] {type(exc).__name__}: {exc}")
             self.done.emit(0, 0, 1, False)
 
 
+class FormatListLoader(QThread):
+    """后台加载 docling 支持的输入格式列表（导入 docling 较重，避免卡 UI）。"""
+
+    loaded = Signal(list)  # [(InputFormat名, 显示名, {扩展名}), ...]
+
+    def run(self) -> None:
+        from .core import input_format_groups
+
+        self.loaded.emit(input_format_groups())
+
+
 class MainWindow(FluentWindow):
-    def __init__(self, initial_folder: str = "") -> None:
+    def __init__(self, initial_path: str = "") -> None:
         super().__init__()
         self.setWindowTitle(f"{APP_NAME} v{__version__}")
-        self.resize(880, 640)
+        self.resize(900, 700)
         self.setAcceptDrops(True)
         self.worker: ConvertWorker | None = None
+        self.format_loader: FormatListLoader | None = None
+        self._format_groups: list[tuple[str, str, frozenset[str]]] = []
+        self.format_checks: dict[str, CheckBox] = {}
         self.settings = QSettings(ORG_NAME, "docling-gui")
 
         # ---------------- 主页面 ----------------
@@ -94,46 +123,88 @@ class MainWindow(FluentWindow):
 
         title = TitleLabel(APP_NAME)
         subtitle = CaptionLabel(
-            "递归批量转换 docling 支持的全部格式，输出保存在源文件同目录（跟随已安装 docling 的能力）"
+            "递归批量转换 docling 支持的全部格式，跟随已安装 docling 的能力"
         )
         layout.addWidget(title)
         layout.addWidget(subtitle)
-        layout.addSpacing(4)
+        layout.addSpacing(2)
 
-        # --- 设置卡片 ---
+        # --- 输入/输出卡片 ---
         card = CardWidget(home)
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(16, 16, 16, 16)
         card_layout.setSpacing(10)
 
-        row1 = QHBoxLayout()
-        row1.addWidget(BodyLabel("根目录"))
+        row_in = QHBoxLayout()
+        row_in.addWidget(BodyLabel("输入路径"))
         self.path_edit = LineEdit()
-        self.path_edit.setPlaceholderText("选择或直接拖入文件夹；也可把文件夹拖到程序图标上启动")
-        row1.addWidget(self.path_edit, 1)
-        self.browse_btn = PushButton(FluentIcon.FOLDER, "浏览…")
-        self.browse_btn.clicked.connect(self._browse)
-        row1.addWidget(self.browse_btn)
-        card_layout.addLayout(row1)
+        self.path_edit.setPlaceholderText("文件夹（递归处理）或单个文件；也可直接拖入窗口")
+        row_in.addWidget(self.path_edit, 1)
+        self.browse_dir_btn = PushButton(FluentIcon.FOLDER, "文件夹…")
+        self.browse_dir_btn.clicked.connect(self._browse_folder)
+        row_in.addWidget(self.browse_dir_btn)
+        self.browse_file_btn = PushButton(FluentIcon.DOCUMENT, "选择文件…")
+        self.browse_file_btn.clicked.connect(self._browse_file)
+        row_in.addWidget(self.browse_file_btn)
+        card_layout.addLayout(row_in)
 
-        row2 = QHBoxLayout()
-        row2.addWidget(BodyLabel("输出格式"))
+        row_out = QHBoxLayout()
+        row_out.addWidget(BodyLabel("输出目录"))
+        self.out_edit = LineEdit()
+        self.out_edit.setPlaceholderText("留空 = 与源文件同路径；填写后按原目录结构镜像输出")
+        row_out.addWidget(self.out_edit, 1)
+        self.out_browse_btn = PushButton(FluentIcon.FOLDER_ADD, "浏览…")
+        self.out_browse_btn.clicked.connect(self._browse_out)
+        row_out.addWidget(self.out_browse_btn)
+        card_layout.addLayout(row_out)
+
+        row_opt = QHBoxLayout()
+        row_opt.addWidget(BodyLabel("输出格式"))
         self.format_combo = ComboBox()
         self._format_keys = list(OUTPUT_FORMATS.keys())
         for key in self._format_keys:
             self.format_combo.addItem(OUTPUT_FORMATS[key][1], userData=key)
-        row2.addWidget(self.format_combo)
-        row2.addSpacing(16)
+        row_opt.addWidget(self.format_combo)
+        row_opt.addSpacing(16)
         self.recursive_cb = CheckBox("包含子文件夹")
         self.recursive_cb.setChecked(True)
         self.overwrite_cb = CheckBox("覆盖已有输出（默认跳过，可断点续转）")
         self.images_cb = CheckBox("导出图片")
         self.images_cb.setChecked(True)
-        row2.addWidget(self.recursive_cb)
-        row2.addWidget(self.overwrite_cb)
-        row2.addWidget(self.images_cb)
-        row2.addStretch(1)
-        card_layout.addLayout(row2)
+        row_opt.addWidget(self.recursive_cb)
+        row_opt.addWidget(self.overwrite_cb)
+        row_opt.addWidget(self.images_cb)
+        row_opt.addStretch(1)
+        card_layout.addLayout(row_opt)
+
+        # --- 输入格式勾选面板 ---
+        fmt_header = QHBoxLayout()
+        fmt_header.addWidget(BodyLabel("转换以下输入格式"))
+        fmt_header.addStretch(1)
+        self.select_all_btn = PushButton("全选")
+        self.select_all_btn.setFixedHeight(28)
+        self.select_all_btn.clicked.connect(lambda: self._set_all_formats(True))
+        self.select_none_btn = PushButton("清空")
+        self.select_none_btn.setFixedHeight(28)
+        self.select_none_btn.clicked.connect(lambda: self._set_all_formats(False))
+        fmt_header.addWidget(self.select_all_btn)
+        fmt_header.addWidget(self.select_none_btn)
+        card_layout.addLayout(fmt_header)
+
+        self.fmt_scroll = ScrollArea()
+        self.fmt_scroll.setWidgetResizable(True)
+        self.fmt_scroll.setFixedHeight(130)
+        self.fmt_scroll.setStyleSheet("QScrollArea{border:1px solid rgba(0,0,0,0.06); border-radius:8px; background:transparent;}")
+        fmt_container = QWidget()
+        self.fmt_flow = FlowLayout(fmt_container, needAni=False)
+        self.fmt_flow.setContentsMargins(8, 4, 8, 4)
+        self.fmt_flow.setHorizontalSpacing(10)
+        self.fmt_flow.setVerticalSpacing(4)
+        self.fmt_hint = CaptionLabel("正在加载格式列表…")
+        self.fmt_hint.setAlignment(Qt.AlignCenter)
+        self.fmt_flow.addWidget(self.fmt_hint)
+        self.fmt_scroll.setWidget(fmt_container)
+        card_layout.addWidget(self.fmt_scroll)
         layout.addWidget(card)
 
         # --- 操作按钮 ---
@@ -168,62 +239,153 @@ class MainWindow(FluentWindow):
         self.addSubInterface(home, FluentIcon.HOME, "转换")
 
         # --- 恢复上次设置 ---
-        last_dir = self.settings.value("last_dir", "")
-        if not initial_folder and last_dir:
-            initial_folder = str(last_dir)
-        if initial_folder:
-            self.path_edit.setText(initial_folder)
+        last_path = self.settings.value("last_path", "")
+        if not initial_path and last_path:
+            initial_path = str(last_path)
+        if initial_path:
+            self.path_edit.setText(initial_path)
         self.format_combo.setCurrentIndex(int(self.settings.value("out_format_index", 0)))
         self.overwrite_cb.setChecked(self.settings.value("overwrite", False, type=bool))
         self.images_cb.setChecked(self.settings.value("images", True, type=bool))
         self.recursive_cb.setChecked(self.settings.value("recursive", True, type=bool))
 
+        # 异步加载格式列表
+        QTimer.singleShot(10, self._load_formats)
+
+    # ------------------------------------------------------- 格式勾选面板
+    def _load_formats(self) -> None:
+        self.format_loader = FormatListLoader()
+        self.format_loader.loaded.connect(self._populate_formats)
+        self.format_loader.finished.connect(self.format_loader.deleteLater)
+        self.format_loader.start()
+
+    def _populate_formats(self, groups: list) -> None:
+        self._format_groups = groups
+        self.fmt_flow.removeWidget(self.fmt_hint)
+        self.fmt_hint.deleteLater()
+
+        saved: list | None = self.settings.value("formats")
+        saved_set = set(saved) if saved else None
+
+        for name, disp, exts in groups:
+            cb = CheckBox(disp)
+            cb.setToolTip("、".join(sorted(exts)))
+            cb.setChecked(True if saved_set is None else name in saved_set)
+            self.fmt_flow.addWidget(cb)
+            self.format_checks[name] = cb
+
+    def _set_all_formats(self, checked: bool) -> None:
+        for cb in self.format_checks.values():
+            cb.setChecked(checked)
+
+    def _checked_formats(self) -> set[str]:
+        return {name for name, cb in self.format_checks.items() if cb.isChecked()}
+
     # ------------------------------------------------------------------ 拖拽
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802
         if event.mimeData().hasUrls():
-            for url in event.mimeData().urls():
-                if Path(url.toLocalFile()).is_dir():
-                    event.acceptProposedAction()
-                    return
+            event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent) -> None:  # noqa: N802
         for url in event.mimeData().urls():
             path = Path(url.toLocalFile())
-            if path.is_dir():
+            if path.is_dir() or path.is_file():
                 self.path_edit.setText(str(path))
                 return
 
     # ------------------------------------------------------------------ 动作
-    def _browse(self) -> None:
-        start = self.path_edit.text() or self.settings.value("last_dir", "") or str(Path.home())
-        folder = QFileDialog_getExistingDirectory(self, start)
+    def _browse_folder(self) -> None:
+        start = self._browse_start()
+        folder = QFileDialog.getExistingDirectory(self, "选择根文件夹", start)
         if folder:
             self.path_edit.setText(folder)
 
+    def _browse_file(self) -> None:
+        start = self._browse_start()
+        exts = sorted(
+            {e for _, _, group_exts in self._format_groups for e in group_exts}
+        )
+        pattern = " ".join(f"*.{e}" for e in exts) or "*"
+        file, _ = QFileDialog.getOpenFileName(
+            self, "选择文件", start, f"支持的格式 ({pattern});;所有文件 (*)"
+        )
+        if file:
+            self.path_edit.setText(file)
+
+    def _browse_out(self) -> None:
+        folder = QFileDialog.getExistingDirectory(
+            self, "选择输出目录", self.out_edit.text() or self._browse_start()
+        )
+        if folder:
+            self.out_edit.setText(folder)
+
+    def _browse_start(self) -> str:
+        return (
+            self.path_edit.text()
+            or self.settings.value("last_path", "")
+            or str(Path.home())
+        )
+
     def _start(self) -> None:
-        folder = self.path_edit.text().strip().strip('"')
-        if not folder or not Path(folder).is_dir():
+        path_text = self.path_edit.text().strip().strip('"')
+        path = Path(path_text) if path_text else None
+        if path is None or not (path.is_dir() or path.is_file()):
             InfoBar.warning(
-                title=APP_NAME,
-                content="请先选择一个存在的文件夹",
-                parent=self,
-                duration=3000,
+                title=APP_NAME, content="请先选择存在的文件或文件夹", parent=self, duration=3000
             )
             return
-        self.settings.setValue("last_dir", folder)
+
+        out_dir = self.out_edit.text().strip().strip('"')
+        if out_dir and Path(out_dir).is_file():
+            InfoBar.warning(
+                title=APP_NAME, content="输出目录不能是一个文件路径", parent=self, duration=3000
+            )
+            return
+
+        checked = self._checked_formats()
+        if not checked:
+            InfoBar.warning(
+                title=APP_NAME, content="请至少勾选一种要转换的输入格式", parent=self, duration=3000
+            )
+            return
+
+        # 校验单文件时扩展名是否被勾选的格式覆盖
+        if path.is_file() and self._format_groups:
+            from .core import _is_supported
+
+            exts_union = set().union(
+                *(exts for name, _, exts in self._format_groups if name in checked)
+            )
+            if not _is_supported(path, exts_union):
+                InfoBar.warning(
+                    title=APP_NAME,
+                    content="所选文件的格式未被勾选（请勾选对应格式或换文件）",
+                    parent=self,
+                    duration=4000,
+                )
+                return
+
+        self.settings.setValue("last_path", str(path))
         self.settings.setValue("out_format_index", self.format_combo.currentIndex())
         self.settings.setValue("overwrite", self.overwrite_cb.isChecked())
         self.settings.setValue("images", self.images_cb.isChecked())
         self.settings.setValue("recursive", self.recursive_cb.isChecked())
+        self.settings.setValue("formats", sorted(checked))
 
         self.log_view.clear()
-        self._log(f"根目录：{folder}")
+        self._log(f"输入：{path}")
+        self._log(f"输出：{out_dir if out_dir else '与源文件同路径'}")
+
+        from .core import extensions_of_formats
+
         self.worker = ConvertWorker(
-            folder=folder,
+            path=str(path),
             out_format=self._format_keys[self.format_combo.currentIndex()],
             overwrite=self.overwrite_cb.isChecked(),
             export_images=self.images_cb.isChecked(),
             recursive=self.recursive_cb.isChecked(),
+            allowed_exts=frozenset(extensions_of_formats(checked)) if self._format_groups else None,
+            out_dir=out_dir,
         )
         self.worker.log_line.connect(self._log)
         self.worker.progress.connect(self._on_progress)
@@ -242,7 +404,12 @@ class MainWindow(FluentWindow):
         self.start_btn.setEnabled(not running)
         self.stop_btn.setEnabled(running)
         self.path_edit.setEnabled(not running)
-        self.browse_btn.setEnabled(not running)
+        self.out_edit.setEnabled(not running)
+        self.browse_dir_btn.setEnabled(not running)
+        self.browse_file_btn.setEnabled(not running)
+        self.out_browse_btn.setEnabled(not running)
+        self.select_all_btn.setEnabled(not running)
+        self.select_none_btn.setEnabled(not running)
         self.progress_bar.hide()
         self.busy_bar.setVisible(running)
 
@@ -287,15 +454,9 @@ class MainWindow(FluentWindow):
         event.accept()
 
 
-def QFileDialog_getExistingDirectory(parent, start: str) -> str:
-    from PySide6.QtWidgets import QFileDialog
-
-    return QFileDialog.getExistingDirectory(parent, "选择根目录", str(start))
-
-
-def run_gui(initial_folder: str = "") -> int:
+def run_gui(initial_path: str = "") -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
-    window = MainWindow(initial_folder)
+    window = MainWindow(initial_path)
     window.show()
     return app.exec()

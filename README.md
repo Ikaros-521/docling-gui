@@ -8,14 +8,17 @@
 ## ✨ 特性
 
 - 📂 **递归批量**：选定根目录后递归处理所有子文件夹，输出与源文件同路径同名
+- 📄 **单文件或文件夹**：输入可以是单个文件，也可以是整个文件夹
+- 🎯 **输出目录可选**：留空 = 与源文件同路径；填写 = 按原目录结构镜像输出（图片随输出文件存放）
+- ✅ **输入格式勾选**：按 docling 输入格式逐项勾选要转换哪些文件（界面 37 项，动态跟随官方能力）
 - 🔍 **输入格式跟随官方能力**：扫描范围动态取自已安装 docling 的格式映射，支持
   PDF、Office（含旧版 .doc/.xls/.ppt，需 LibreOffice）、HTML、Markdown、图片、
   音频、EPUB、CSV、XML 系列等（详见下表）
 - 📤 **五种输出**：Markdown / HTML / JSON（DoclingDocument 无损）/ DocTags XML / 纯文本
 - 🖼️ **图片导出**：md/html/json 输出时内嵌图片自动导出到 `<名称>_images/`，相对链接引用
 - ⏸️ **可中断**：后台线程运行，随时停止；默认跳过已存在的输出，可断点续转
-- 🎨 **Fluent 风格界面**：QFluentWidgets 组件、拖拽文件夹、实时日志与进度
-- 💻 **双模式**：GUI + 命令行（`--list-formats` 可查看当前支持的输入扩展名）
+- 🎨 **Fluent 风格界面**：QFluentWidgets 组件、拖拽文件/文件夹、实时日志与进度
+- 💻 **双模式**：GUI + 命令行（`--list-formats` 可查看当前支持的输入格式）
 
 ## 📥 支持的输入格式（docling 官方清单）
 
@@ -68,27 +71,36 @@
 
 ### GUI
 
-1. 选择（或直接拖入）根目录
-2. 选择输出格式，按需勾选：包含子文件夹 / 覆盖已有输出 / 导出图片
-3. 点「开始转换」，日志实时显示每个文件的结果
+1. 输入路径：选择文件夹（递归）或单个文件，也可直接拖入窗口
+2. 输出目录：留空 = 与源文件同路径；填写后按原目录结构镜像输出
+3. 输出格式 + 勾选要转换的输入格式、子文件夹 / 覆盖 / 图片选项
+4. 点「开始转换」，日志实时显示每个文件的结果
 
-技巧：把文件夹拖到程序图标上启动会自动填入路径。
+技巧：把文件或文件夹拖到程序图标上启动会自动填入路径。
 
 ### 命令行
 
 ```bash
-# 递归转换整个文件夹（默认输出 Markdown）
+# 递归转换整个文件夹（默认输出 Markdown，与源文件同路径）
 docling-gui D:\docs
 
-# 指定输出格式
-docling-gui D:\docs --to html
+# 转换单个文件
+docling-gui D:\docs\report.docx
+
+# 输出到指定目录（按原目录结构镜像）
+docling-gui D:\docs --out E:\md_out
+
+# 只转换指定格式（InputFormat 名，--list-formats 可查）
+docling-gui D:\docs --formats pdf,docx,image
 
 # 常用参数
 --to md|html|json|doctags|txt   输出格式（默认 md）
+--out DIR                       输出目录（留空 = 与源文件同路径）
+--formats NAME[,NAME...]        只转换指定输入格式（如 pdf,docx,image）
 --overwrite                     覆盖已存在的输出（默认跳过）
 --no-images                     不导出内嵌图片
 --flat                          不递归子文件夹
---list-formats                  列出当前支持的输入扩展名
+--list-formats                  列出当前支持的输入格式（含扩展名）
 --version                       显示版本
 ```
 

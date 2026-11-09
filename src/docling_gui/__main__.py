@@ -1,7 +1,7 @@
 """入口模块。
 
-- 源码运行：python -m docling_gui [文件夹]
-- 不带文件夹 / --gui：启动图形界面
+- 源码运行：python -m docling_gui [文件或文件夹]
+- 不带路径 / --gui：启动图形界面
 - 打包后的程序：不带 --cli 时始终进 GUI（windowed 无控制台，CLI 输出不可见）
 """
 
@@ -39,27 +39,48 @@ def _fix_console_encoding() -> None:
                 pass
 
 
+def _resolve_formats(spec: str) -> frozenset[str] | None:
+    """把 'pdf,docx,image' 这样的 InputFormat 名单解析为扩展名集合。"""
+    from .core import input_format_groups
+
+    valid = {name.lower(): (name, disp, exts) for name, disp, exts in input_format_groups()}
+    allowed: set[str] = set()
+    for token in spec.split(","):
+        t = token.strip().lower()
+        if not t:
+            continue
+        if t not in valid:
+            _safe_print(f"错误：未知输入格式 {token!r}。可用值：")
+            _safe_print("  " + "  ".join(sorted(valid)))
+            raise SystemExit(2)
+        allowed.update(valid[t][2])
+    return frozenset(allowed) if allowed else None
+
+
 def main(argv: list[str] | None = None) -> int:
     from . import __version__
     from .core import OUTPUT_FORMATS
 
     parser = argparse.ArgumentParser(
         prog="docling-gui",
-        description="递归把文件夹内所有 docling 支持的文件转为指定格式（输出到源文件同目录）",
+        description="递归把文件夹（或单个文件）内 docling 支持的文件转为指定格式；"
+        "默认输出到源文件同路径，可用 --out 指定输出目录（镜像目录结构）",
     )
-    parser.add_argument("folder", nargs="?", default="", help="要处理的根文件夹（不传则启动 GUI）")
+    parser.add_argument("path", nargs="?", default="", help="要处理的文件或根文件夹（不传则启动 GUI）")
     parser.add_argument(
         "--to",
         choices=list(OUTPUT_FORMATS.keys()),
         default="md",
         help="输出格式：md/html/json/doctags/txt（默认 md）",
     )
+    parser.add_argument("--out", default="", help="输出目录（留空 = 与源文件同路径；按原目录结构镜像）")
+    parser.add_argument("--formats", default="", help="只转换指定格式，逗号分隔 InputFormat 名（如 pdf,docx,image；留空 = 全部）")
     parser.add_argument("--overwrite", action="store_true", help="覆盖已存在的输出（默认跳过）")
     parser.add_argument("--no-images", action="store_true", help="不导出内嵌图片")
     parser.add_argument("--flat", action="store_true", help="不递归子文件夹")
     parser.add_argument("--gui", action="store_true", help="强制启动 GUI")
     parser.add_argument("--cli", action="store_true", help="强制命令行模式")
-    parser.add_argument("--list-formats", action="store_true", help="列出当前 docling 支持的输入扩展名后退出")
+    parser.add_argument("--list-formats", action="store_true", help="列出当前 docling 支持的输入格式后退出")
     parser.add_argument("--version", action="store_true", help="显示版本号后退出")
     args = parser.parse_args(argv)
 
@@ -68,26 +89,31 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.list_formats:
-        from .core import supported_extensions
+        from .core import input_format_groups, supported_extensions
 
         _fix_console_encoding()
-        _safe_print("支持的输入扩展名（来自已安装的 docling）：")
+        _safe_print("支持的输入格式（来自已安装的 docling）：")
+        for name, disp, exts in input_format_groups():
+            _safe_print(f"  {name:<14} {disp}  [{' '.join(sorted(exts))}]")
+        _safe_print("\n全部扩展名：")
         _safe_print("  " + "  ".join(sorted(supported_extensions())))
         return 0
 
-    folder = args.folder
-    if args.gui or not folder:
-        return _run_gui(folder)
+    path = args.path
+    if args.gui or not path:
+        return _run_gui(path)
     if getattr(sys, "frozen", False) and not args.cli:
-        # windowed 打包下拖拽文件夹启动：没有控制台，CLI 输出无处显示，进 GUI
-        return _run_gui(folder)
+        # windowed 打包下拖拽文件/文件夹启动：没有控制台，CLI 输出无处显示，进 GUI
+        return _run_gui(path)
 
     # ---------------- CLI 模式 ----------------
     _fix_console_encoding()
-    root = Path(folder)
-    if not root.is_dir():
-        _safe_print(f"错误：文件夹不存在：{root}")
+    root = Path(path)
+    if not root.is_dir() and not root.is_file():
+        _safe_print(f"错误：路径不存在：{root}")
         return 2
+
+    allowed_exts = _resolve_formats(args.formats) if args.formats.strip() else None
 
     from .core import BatchConverter
 
@@ -96,16 +122,18 @@ def main(argv: list[str] | None = None) -> int:
         overwrite=args.overwrite,
         export_images=not args.no_images,
         recursive=not args.flat,
+        allowed_exts=allowed_exts,
+        out_dir=args.out or None,
         log=_safe_print,
     )
     summary = converter.convert_tree(root)
     return 0 if (summary.failed == 0 and not summary.stopped) else 1
 
 
-def _run_gui(folder: str) -> int:
+def _run_gui(path: str) -> int:
     from .app import run_gui
 
-    return run_gui(folder)
+    return run_gui(path)
 
 
 if __name__ == "__main__":
