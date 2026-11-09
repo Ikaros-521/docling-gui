@@ -1,0 +1,89 @@
+name: Build & Release
+
+on:
+  workflow_dispatch: # 手动触发
+  push:
+    tags:
+      - "v*" # 推送 v* 标签时自动构建并发布 Release
+
+permissions:
+  contents: write # softprops/action-gh-release 创建 Release 需要
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: docx2md-windows-x64
+          - os: ubuntu-latest
+            asset: docx2md-linux-x64
+          - os: macos-latest
+            asset: docx2md-macos-arm64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 先装 CPU 版 torch：否则 Linux 上 docling 会拉 CUDA 版（多下几个 GB，
+      # 虽然打包时会排除，但白白浪费时间）。spec 会把 torch 全家排除出产物。
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install pyinstaller python-docx pillow
+
+      - name: Install Linux system libs (Qt runtime)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0
+
+      - name: Build
+        run: pyinstaller docx2md.spec --noconfirm
+
+      - name: Smoke test (headless: --version + real conversion)
+        shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          if [ -d dist/docx2md/docx2md.app ]; then
+            BIN="dist/docx2md/docx2md.app/Contents/MacOS/docx2md"
+          elif [ -f dist/docx2md/docx2md.exe ]; then
+            BIN=dist/docx2md/docx2md.exe
+          else
+            BIN=dist/docx2md/docx2md
+          fi
+          "$BIN" --version
+          python tests/make_sample.py tests/_sandbox/sample.docx
+          "$BIN" --cli tests/_sandbox
+          test -f tests/_sandbox/sample.md
+          echo "SMOKE OK: $BIN"
+
+      - name: Zip artifact
+        shell: bash
+        run: |
+          cd dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a -tzip ../${{ matrix.asset }}.zip docx2md
+          else
+            zip -qry ../${{ matrix.asset }}.zip docx2md
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}.zip
+
+      - name: Create Release and upload
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}.zip
+          generate_release_notes: true
