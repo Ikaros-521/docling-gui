@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Docling GUI: Batch Document Conversion Desktop App for docling"
+type: software
+authors:
+  - name: "Ikaros-521"
+license: MIT
+version: 0.4.0
+repository-code: "https://github.com/Ikaros-521/docling-gui"
+url: "https://github.com/Ikaros-521/docling-gui"
+abstract: "A free, open-source desktop GUI and CLI that recursively batch-converts all docling-supported document formats (PDF, Office, images, audio, HTML, EPUB, email; 37 format families) into Markdown, HTML, lossless JSON, DocTags XML or plain text. Fully local and offline, for Windows, macOS and Linux."
+keywords:
+  - docling
+  - document conversion
+  - PDF to Markdown
+  - OCR
+  - batch conversion
+  - RAG
+  - PySide6
+  - GUI

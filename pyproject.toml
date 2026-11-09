@@ -5,12 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "docling-gui"
 version = "0.4.0"
-description = "递归批量转换 docling 支持的全部文档格式为 Markdown/HTML/JSON/DocTags/纯文本，跨平台 GUI"
+description = "docling GUI: batch-convert PDF/Office/images/audio to Markdown/HTML/JSON/DocTags/text（docling 图形界面，递归批量文档转换）"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Ikaros-521" }]
+keywords = ["docling", "pdf-to-markdown", "document-conversion", "ocr", "batch-converter", "gui", "pyside6", "markdown", "rag", "desktop-app"]
 dependencies = [
     "docling[audio,asr]>=2.149.0",
     "PySide6>=6.6.0",
@@ -19,6 +20,12 @@ dependencies = [
 
 [project.scripts]
 docling-gui = "docling_gui.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/Ikaros-521/docling-gui"
+Repository = "https://github.com/Ikaros-521/docling-gui.git"
+Issues = "https://github.com/Ikaros-521/docling-gui/issues"
+Downloads = "https://github.com/Ikaros-521/docling-gui/releases"
 
 [tool.setuptools.packages.find]
 where = ["src"]

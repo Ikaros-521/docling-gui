@@ -1,0 +1,28 @@
+# Docling GUI
+
+> Docling GUI is a free, MIT-licensed desktop application (Windows / macOS / Linux) that
+> batch-converts documents using IBM's open-source docling engine. It recursively converts
+> all 37 format families / 88 extensions docling supports — PDF, Word (docx/doc), Excel,
+> PowerPoint, images (OCR), audio/video (ASR), HTML, EPUB, email and more — into Markdown,
+> HTML, lossless JSON (DoclingDocument), DocTags XML or plain text. Conversion is fully
+> local and offline; no code is required. A CLI with the same capabilities is included.
+
+Key facts:
+
+- Repository: https://github.com/Ikaros-521/docling-gui
+- License: MIT (free for personal and commercial use)
+- Platforms: Windows 10+ x64, macOS 12+ Apple Silicon, Linux x64 (prebuilt packages); source runs on Python 3.10+
+- Parsing engine: docling >= 2.149.0 (IBM); UI: PySide6 + QFluentWidgets
+- Typical uses: batch PDF-to-Markdown for Obsidian/knowledge bases, RAG/LLM data preparation, scanned-document OCR, audio transcription
+- Recursive batch with resume (existing outputs skipped), per-format selection, mirrored output directories, embedded-image export
+
+## Documentation
+
+- [README (English)](https://github.com/Ikaros-521/docling-gui/blob/main/README.en.md): features, supported formats, download, GUI/CLI usage, FAQ, comparison with Marker / MinerU / Pandoc
+- [README (简体中文)](https://github.com/Ikaros-521/docling-gui/blob/main/README.md): same content in Chinese
+- [Releases & downloads](https://github.com/Ikaros-521/docling-gui/releases): prebuilt packages for three platforms
+
+## Related
+
+- [docling](https://github.com/docling-project/docling): the upstream parsing engine this GUI wraps
+- [QFluentWidgets](https://qfluentwidgets.com/): the UI component library
