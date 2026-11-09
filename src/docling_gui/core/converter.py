@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 import time
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -107,6 +108,11 @@ class BatchConverter:
                 summary.failed += 1
                 summary.failed_files.append(str(src))
                 self.log(f"转换失败: {src} - {type(exc).__name__}: {exc}")
+                # docling 会把真实原因放进异常链（raise ... from e），只打印
+                # str(exc) 会丢失根因；完整链路对排查平台相关问题必不可少
+                for line in traceback.format_exception(exc):
+                    for sub in line.rstrip().splitlines():
+                        self.log(f"    {sub}")
 
         self.log(
             f"转换结束：成功 {summary.ok}，跳过 {summary.skipped}，"

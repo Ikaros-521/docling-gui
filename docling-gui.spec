@@ -18,7 +18,10 @@ hiddenimports = [
     "docling.models.plugins.defaults",
 ]
 
-for pkg in ("docling_core", "filetype", "latex2mathml", "docx2python", "easyocr", "docling_ibm_models"):
+# "docx"（python-docx）的页眉/页脚模板是包内数据文件（docx/templates/*.xml），
+# 静态分析不会自动携带；冻结后 docx 后端首次处理页眉会 FileNotFoundError，
+# 最终表现为 docling 抛 "Pipeline SimplePipeline failed"
+for pkg in ("docling_core", "filetype", "latex2mathml", "docx2python", "easyocr", "docling_ibm_models", "docx"):
     datas += collect_data_files(pkg)
 
 # qfluentwidgets：qss/图片/字体等资源 + 动态导入
@@ -49,6 +52,11 @@ a = Analysis(
         "jupyter",
         "pytest",
     ],
+    # python-docx 用 __file__ 相对路径访问模板（docx/parts/../templates/*.xml）。
+    # 纯 py 模块默认进 PYZ 归档，磁盘上没有 docx/parts 目录：POSIX 内核逐级
+    # 解析路径要求中间目录真实存在，冻结后 Linux/macOS 会 FileNotFoundError
+    # （Windows 的 Win32 对 .. 做词法规范化所以侥幸能过）。改为实体 .py 落盘。
+    module_collection_mode={"docx": "py"},
     noarchive=False,
 )
 
