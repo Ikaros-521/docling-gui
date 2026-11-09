@@ -16,11 +16,11 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            asset: docx2md-windows-x64
+            asset: docling-gui-windows-x64
           - os: ubuntu-latest
-            asset: docx2md-linux-x64
+            asset: docling-gui-linux-x64
           - os: macos-latest
-            asset: docx2md-macos-arm64
+            asset: docling-gui-macos-arm64
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -30,14 +30,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      # 先装 CPU 版 torch：否则 Linux 上 docling 会拉 CUDA 版（多下几个 GB，
-      # 虽然打包时会排除，但白白浪费时间）。spec 会把 torch 全家排除出产物。
+      # 先装 CPU 版 torch/torchaudio：否则 Linux 上会拉 CUDA 版（多下几个 GB）。
+      # macOS 的官方 torch 本身就是 CPU/MPS 构建，无需专门处理。
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          if [ "$RUNNER_OS" != "macOS" ]; then
+            pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          fi
           pip install -r requirements.txt
-          pip install pyinstaller python-docx pillow
+          pip install pyinstaller python-docx python-pptx openpyxl pillow
 
       - name: Install Linux system libs (Qt runtime)
         if: runner.os == 'Linux'
@@ -46,19 +48,19 @@ jobs:
           sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0
 
       - name: Build
-        run: pyinstaller docx2md.spec --noconfirm
+        run: pyinstaller docling-gui.spec --noconfirm
 
       - name: Smoke test (headless: --version + real conversion)
         shell: bash
         env:
           PYTHONIOENCODING: utf-8
         run: |
-          if [ -d dist/docx2md/docx2md.app ]; then
-            BIN="dist/docx2md/docx2md.app/Contents/MacOS/docx2md"
-          elif [ -f dist/docx2md/docx2md.exe ]; then
-            BIN=dist/docx2md/docx2md.exe
+          if [ -d dist/docling-gui/docling-gui.app ]; then
+            BIN="dist/docling-gui/docling-gui.app/Contents/MacOS/docling-gui"
+          elif [ -f dist/docling-gui/docling-gui.exe ]; then
+            BIN=dist/docling-gui/docling-gui.exe
           else
-            BIN=dist/docx2md/docx2md
+            BIN=dist/docling-gui/docling-gui
           fi
           "$BIN" --version
           python tests/make_sample.py tests/_sandbox/sample.docx
@@ -71,9 +73,9 @@ jobs:
         run: |
           cd dist
           if [ "$RUNNER_OS" = "Windows" ]; then
-            7z a -tzip ../${{ matrix.asset }}.zip docx2md
+            7z a -tzip ../${{ matrix.asset }}.zip docling-gui
           else
-            zip -qry ../${{ matrix.asset }}.zip docx2md
+            zip -qry ../${{ matrix.asset }}.zip docling-gui
           fi
 
       - uses: actions/upload-artifact@v4

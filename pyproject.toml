@@ -3,20 +3,22 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "docx2md-gui"
-version = "0.1.0"
-description = "递归批量把 Word(.docx) 转成 Markdown（同路径输出），基于 docling，跨平台 GUI"
+name = "docling-gui"
+version = "0.2.0"
+description = "递归批量转换 docling 支持的全部文档格式为 Markdown/HTML/JSON/DocTags/纯文本，跨平台 GUI"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Ikaros-521" }]
 dependencies = [
-    "docling>=2.15.0",
+    "docling[audio,asr]>=2.149.0",
     "PySide6>=6.6.0",
+    "PySide6-Fluent-Widgets>=1.8.0",
 ]
 
 [project.scripts]
-docx2md = "docx2md_gui.__main__:main"
+docling-gui = "docling_gui.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

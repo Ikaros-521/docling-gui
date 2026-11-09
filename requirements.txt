@@ -1,2 +1,3 @@
-docling>=2.15.0
+docling[audio,asr]>=2.149.0
 PySide6>=6.6.0
+PySide6-Fluent-Widgets>=1.8.0

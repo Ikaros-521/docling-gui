@@ -1,8 +1,8 @@
 """入口模块。
 
-- 源码运行：python -m docx2md_gui [文件夹]
+- 源码运行：python -m docling_gui [文件夹]
 - 不带文件夹 / --gui：启动图形界面
-- 打包后的 exe：直接拖文件夹到 exe 上也会启动 GUI；--cli 强制命令行模式
+- 打包后的程序：不带 --cli 时始终进 GUI（windowed 无控制台，CLI 输出不可见）
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def _safe_print(msg: str) -> None:
             out.buffer.flush()
         except Exception:
             pass
-    except Exception:  # windowed exe 里 sys.stdout 可能为 None
+    except Exception:  # windowed 打包里 sys.stdout 可能为 None
         pass
 
 
@@ -40,33 +40,46 @@ def _fix_console_encoding() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from . import __version__
+    from .core import OUTPUT_FORMATS
+
     parser = argparse.ArgumentParser(
-        prog="docx2md",
-        description="递归把文件夹内所有 .docx 转成同路径同名 .md（基于 docling）",
+        prog="docling-gui",
+        description="递归把文件夹内所有 docling 支持的文件转为指定格式（输出到源文件同目录）",
     )
     parser.add_argument("folder", nargs="?", default="", help="要处理的根文件夹（不传则启动 GUI）")
-    parser.add_argument("--overwrite", action="store_true", help="覆盖已存在的 .md（默认跳过）")
+    parser.add_argument(
+        "--to",
+        choices=list(OUTPUT_FORMATS.keys()),
+        default="md",
+        help="输出格式：md/html/json/doctags/txt（默认 md）",
+    )
+    parser.add_argument("--overwrite", action="store_true", help="覆盖已存在的输出（默认跳过）")
     parser.add_argument("--no-images", action="store_true", help="不导出内嵌图片")
     parser.add_argument("--flat", action="store_true", help="不递归子文件夹")
     parser.add_argument("--gui", action="store_true", help="强制启动 GUI")
-    parser.add_argument("--cli", action="store_true", help="强制命令行模式（打包 exe 中使用）")
+    parser.add_argument("--cli", action="store_true", help="强制命令行模式")
+    parser.add_argument("--list-formats", action="store_true", help="列出当前 docling 支持的输入扩展名后退出")
     parser.add_argument("--version", action="store_true", help="显示版本号后退出")
     args = parser.parse_args(argv)
 
-    from . import __version__
-
     if args.version:
-        _safe_print(f"docx2md {__version__}")
+        _safe_print(f"docling-gui {__version__}")
         return 0
 
-    frozen = getattr(sys, "frozen", False)
-    folder = args.folder
+    if args.list_formats:
+        from .core import supported_extensions
 
-    # 决定走 GUI 还是 CLI
+        _fix_console_encoding()
+        _safe_print("支持的输入扩展名（来自已安装的 docling）：")
+        _safe_print("  " + "  ".join(sorted(supported_extensions())))
+        return 0
+
+    folder = args.folder
     if args.gui or not folder:
         return _run_gui(folder)
-    if frozen and not args.cli:
-        # windowed exe 下拖拽文件夹启动：没有控制台，CLI 输出无处显示，进 GUI
+    if getattr(sys, "frozen", False) and not args.cli:
+        # windowed 打包下拖拽文件夹启动：没有控制台，CLI 输出无处显示，进 GUI
         return _run_gui(folder)
 
     # ---------------- CLI 模式 ----------------
@@ -79,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     from .core import BatchConverter
 
     converter = BatchConverter(
+        out_format=args.to,
         overwrite=args.overwrite,
         export_images=not args.no_images,
         recursive=not args.flat,
