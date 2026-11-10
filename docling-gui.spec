@@ -21,7 +21,20 @@ hiddenimports = [
 # "docx"（python-docx）的页眉/页脚模板是包内数据文件（docx/templates/*.xml），
 # 静态分析不会自动携带；冻结后 docx 后端首次处理页眉会 FileNotFoundError，
 # 最终表现为 docling 抛 "Pipeline SimplePipeline failed"
-for pkg in ("docling_core", "filetype", "latex2mathml", "docx2python", "easyocr", "docling_ibm_models", "docx"):
+# docling_parse 的 pdf_resources（fonts/glyphs/cmap，约 25MB）是 C++ 解析器打开
+# PDF 的必需资源；rapidocr 的 ONNX 模型同理。均为包内数据目录，静态分析不会
+# 收集，缺失时冻结产物打开 PDF 直接 RuntimeError
+for pkg in (
+    "docling_core",
+    "filetype",
+    "latex2mathml",
+    "docx2python",
+    "easyocr",
+    "docling_ibm_models",
+    "docx",
+    "docling_parse",
+    "rapidocr",
+):
     datas += collect_data_files(pkg)
 
 # qfluentwidgets：qss/图片/字体等资源 + 动态导入

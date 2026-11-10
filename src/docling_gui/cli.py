@@ -37,6 +37,39 @@ def _fix_console_encoding() -> None:
                 pass
 
 
+def _setup_logging(to_file: bool) -> None:
+    """把根 logger 接到可见出口。
+
+    docling 等三方库把真实异常只记进 logging（`_log.exception`），应用若不接
+    handler，冻结 GUI 里这些根因会静默丢失。CLI 模式输出到 stderr（WARNING+
+    即可，ERROR 级会带堆栈）；GUI 模式写轮转日志文件供事后排查。
+    """
+    import logging
+    from logging.handlers import RotatingFileHandler
+
+    root = logging.getLogger()
+    if to_file:
+        root.setLevel(logging.INFO)
+        try:
+            log_dir = Path.home() / ".docling-gui"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            handler: logging.Handler = RotatingFileHandler(
+                log_dir / "docling-gui.log",
+                maxBytes=1_000_000,
+                backupCount=2,
+                encoding="utf-8",
+            )
+        except OSError:
+            return  # 日志写不了也不能挡住转换主流程
+    else:
+        root.setLevel(logging.WARNING)
+        handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    root.addHandler(handler)
+
+
 def _resolve_formats(spec: str) -> frozenset[str] | None:
     """把 'pdf,docx,image' 这样的 InputFormat 名单解析为扩展名集合。"""
     from .core import input_format_groups
@@ -106,10 +139,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     path = args.path
-    if args.gui or not path:
-        return _run_gui(path)
-    if getattr(sys, "frozen", False) and not args.cli:
-        # windowed 打包下拖拽文件/文件夹启动：没有控制台，CLI 输出无处显示，进 GUI
+    # windowed 打包下拖拽文件/文件夹启动：没有控制台，CLI 输出无处显示，进 GUI
+    run_as_gui = args.gui or not path or (getattr(sys, "frozen", False) and not args.cli)
+    _setup_logging(to_file=run_as_gui)
+    if run_as_gui:
         return _run_gui(path)
 
     # ---------------- CLI 模式 ----------------
