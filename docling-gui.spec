@@ -53,6 +53,17 @@ for pkg in (
 # 命名收集有缺口，缺库时报 "operator torchvision::nms does not exist"
 binaries += collect_dynamic_libs("torchvision")
 
+# macOS（Apple Silicon）：docling[asr] 的 asr_mlx_audio 无条件 import mlx，
+# mlx 的 dylib 走 @rpath 引用（如 libjaccl.dylib），PyInstaller 跟不动 rpath
+# 会漏收导致 dlopen 失败、连带 PDF 管线初始化崩溃。把 mlx/mlx_metal 的全部
+# dylib 平铺收进 _internal/mlx/（命中 libmlx 的 @loader_path/../ 搜索路径）。
+# 仅 macOS 装有这两个包；其他平台 try 兜底。
+for _mlx_pkg in ("mlx", "mlx_metal"):
+    try:
+        binaries += collect_dynamic_libs(_mlx_pkg, destdir="mlx")
+    except Exception:
+        pass
+
 # qfluentwidgets：qss/图片/字体等资源 + 动态导入
 qfw_datas, qfw_binaries, qfw_hiddenimports = collect_all("qfluentwidgets")
 datas += qfw_datas
