@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docling-gui"
-version = "0.4.0"
+version = "0.4.1"
 description = "docling GUI: batch-convert PDF/Office/images/audio to Markdown/HTML/JSON/DocTags/text（docling 图形界面，递归批量文档转换）"
 readme = "README.md"
 requires-python = ">=3.10"
