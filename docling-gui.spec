@@ -55,14 +55,17 @@ binaries += collect_dynamic_libs("torchvision")
 
 # macOS（Apple Silicon）：docling[asr] 的 asr_mlx_audio 无条件 import mlx，
 # mlx 的 dylib 走 @rpath 引用（如 libjaccl.dylib），PyInstaller 跟不动 rpath
-# 会漏收导致 dlopen 失败、连带 PDF 管线初始化崩溃。把 mlx/mlx_metal 的全部
-# dylib 平铺收进 _internal/mlx/（命中 libmlx 的 @loader_path/../ 搜索路径）。
-# 仅 macOS 装有这两个包；其他平台 try 兜底。
-for _mlx_pkg in ("mlx", "mlx_metal"):
-    try:
-        binaries += collect_dynamic_libs(_mlx_pkg, destdir="mlx")
-    except Exception:
-        pass
+# 会漏收 dylib；纯 py 子模块（mlx._reprlib_fix 等）也因动态导入漏收。
+# collect_all 全量收集子模块/数据/dylib；mlx_metal 的 dylib 平铺进 _internal/mlx/
+# （命中 libmlx 的 @loader_path/../ 搜索路径）。仅 macOS 装有，其他平台 try 兜底。
+try:
+    _mlx_datas, _mlx_binaries, _mlx_hidden = collect_all("mlx")
+    datas += _mlx_datas
+    binaries += _mlx_binaries
+    hiddenimports += _mlx_hidden
+    binaries += collect_dynamic_libs("mlx_metal", destdir="mlx")
+except Exception:
+    pass
 
 # qfluentwidgets：qss/图片/字体等资源 + 动态导入
 qfw_datas, qfw_binaries, qfw_hiddenimports = collect_all("qfluentwidgets")
