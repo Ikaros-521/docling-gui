@@ -7,7 +7,12 @@ GitHub Actions 三平台均使用本 spec；Linux/Windows 的 torch 走 CPU 轮�
 拉入 CUDA 依赖。
 """
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, copy_metadata
+from PyInstaller.utils.hooks import (
+    collect_all,
+    collect_data_files,
+    collect_dynamic_libs,
+    copy_metadata,
+)
 
 datas = []
 binaries = []
@@ -16,6 +21,12 @@ hiddenimports = [
     "docling.backend.msword_backend",
     # entry_points 动态加载的默认插件模块，静态分析不可见
     "docling.models.plugins.defaults",
+    # torchvision 的 C++ 算子扩展（注册 torchvision::nms 等）。0.29 起 stable-abi
+    # 轮子把模块从 _C 改名为 _C_stable，hooks-contrib 的 hook 只声明旧名导致
+    # 落空；缺库时 transformers 加载 image processor 报
+    # "operator torchvision::nms does not exist"。旧名不存在时 PyInstaller 仅告警
+    "torchvision._C",
+    "torchvision._C_stable",
 ]
 
 # "docx"（python-docx）的页眉/页脚模板是包内数据文件（docx/templates/*.xml），
@@ -36,6 +47,11 @@ for pkg in (
     "rapidocr",
 ):
     datas += collect_data_files(pkg)
+
+# torchvision 的 C++ 算子库（_C_stable.so/.pyd 等）注册 torchvision::nms 等算子，
+# transformers 的 fast image processor 依赖它；hooks-contrib 对 0.29 的 stable-abi
+# 命名收集有缺口，缺库时报 "operator torchvision::nms does not exist"
+binaries += collect_dynamic_libs("torchvision")
 
 # qfluentwidgets：qss/图片/字体等资源 + 动态导入
 qfw_datas, qfw_binaries, qfw_hiddenimports = collect_all("qfluentwidgets")
@@ -69,7 +85,11 @@ a = Analysis(
     # 纯 py 模块默认进 PYZ 归档，磁盘上没有 docx/parts 目录：POSIX 内核逐级
     # 解析路径要求中间目录真实存在，冻结后 Linux/macOS 会 FileNotFoundError
     # （Windows 的 Win32 对 .. 做词法规范化所以侥幸能过）。改为实体 .py 落盘。
-    module_collection_mode={"docx": "py"},
+    # transformers 的入口类（AutoImageProcessor 等）走 _LazyModule 动态
+    # import，静态分析收不齐子模块，冻结后加载布局模型即失败；整包实体
+    # 落盘让所有惰性导入按正常文件机制解析（hooks-contrib 的 hook 对
+    # transformers 5.x 不够）。
+    module_collection_mode={"docx": "py", "transformers": "py"},
     noarchive=False,
 )
 
