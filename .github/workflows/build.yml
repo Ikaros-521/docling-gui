@@ -59,6 +59,7 @@ jobs:
       # + OCR rapidocr），打进产物实现离线转换。目录布局必须符合 docling 约定：
       # HF 仓库按 repo_id.replace('/', '--')，rapidocr 由 docling-tools 落到 RapidOcr/
       - name: Download docling models (bundled for offline use)
+        shell: bash
         run: |
           python - <<'EOF'
           from huggingface_hub import snapshot_download
