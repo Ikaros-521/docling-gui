@@ -11,6 +11,11 @@ dist/
 
 # 测试产物
 tests/_sandbox/
+tests/_samples/
+tests/_samples_out/
+
+# docling 模型工件（CI/本地下载后打包用，不入库）
+models/
 
 # IDE / 系统
 .idea/

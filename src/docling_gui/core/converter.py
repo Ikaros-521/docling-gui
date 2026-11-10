@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from .formats import OUTPUT_FORMATS
+from .models import bundled_artifacts_path, ensure_hf_endpoint
 from .scanner import collect_supported_files
 
 LogFn = Callable[[str], None]
@@ -77,7 +78,9 @@ class BatchConverter:
         if not files:
             return summary
 
-        self.log("正在初始化 docling 引擎（首次可能较慢；PDF/图片/音频需模型，会自动下载）…")
+        self.log("正在初始化 docling 引擎…")
+        # HF 端点兜底必须在 docling/huggingface_hub 首次导入之前设置
+        ensure_hf_endpoint()
         converter = self._make_converter()
         out_suffix = OUTPUT_FORMATS[self.out_format][0]
 
@@ -130,11 +133,33 @@ class BatchConverter:
         return (self.out_dir / src.relative_to(root_path)).with_suffix(out_suffix)
 
     def _make_converter(self):
-        from docling.document_converter import DocumentConverter
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.document_converter import (
+            DocumentConverter,
+            ImageFormatOption,
+            PdfFormatOption,
+        )
 
+        format_options = {}
+        artifacts = bundled_artifacts_path()
+        if artifacts is not None:
+            # 打包内置（或 DOCLING_ARTIFACTS_PATH 指向）的模型：PDF/图片离线转换，
+            # 不再触发在线下载。仅作用于 PDF/图片管线；音频等其余管线仍走在线。
+            self.log(f"使用内置模型（PDF/图片离线转换）: {artifacts}")
+            format_options = {
+                InputFormat.PDF: PdfFormatOption(
+                    pipeline_options=PdfPipelineOptions(artifacts_path=artifacts)
+                ),
+                InputFormat.IMAGE: ImageFormatOption(
+                    pipeline_options=PdfPipelineOptions(artifacts_path=artifacts)
+                ),
+            }
+        else:
+            self.log("未检测到内置模型，PDF/图片所需模型将按需在线下载（HF 不可达时自动切换镜像）")
         # 不限制 allowed_formats：支持已安装 docling 的全部输入格式
         # （输入格式过滤在扫描阶段已完成，这里交给 docling 自行嗅探）
-        return DocumentConverter()
+        return DocumentConverter(format_options=format_options)
 
     def _convert_one(self, converter, src: Path, dst: Path) -> None:
         from docling.datamodel.base_models import ConversionStatus

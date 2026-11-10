@@ -64,6 +64,24 @@ hiddenimports += qfw_hiddenimports
 for dist in ("docling_slim", "docling_core"):
     datas += copy_metadata(dist)
 
+# 打包 docling 模型工件（布局 + 表格），运行时实现 PDF/图片离线转换。
+# CI 先经 snapshot_download 生成 models/ 目录（布局 docling-project--<repo>）；
+# 本地无该目录时跳过（转换器会回退到按需在线下载）。运行时由
+# docling_gui.core.models.bundled_artifacts_path() 定位并注入 artifacts_path
+import os
+
+from pathlib import Path as _Path
+
+_models_dir = os.environ.get("DOCLING_MODELS_DIR") or "models"
+if (_Path(_models_dir) / "docling-project--docling-layout-heron").is_dir():
+    _root = _Path(_models_dir)
+    for _p in sorted(_root.rglob("*")):
+        if _p.is_file() and ".cache" not in _p.parts:
+            datas.append(
+                (str(_p), str(_Path("docling-models") / _p.relative_to(_root).parent))
+            )
+    print(f"spec: bundling docling models from {_root}")
+
 a = Analysis(
     ["launcher.py"],
     pathex=["src"],

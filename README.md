@@ -32,6 +32,7 @@
 - ✅ **输入格式勾选**：37 种输入格式逐项勾选（含旧版 Office、音频、Email 等全能力），动态跟随已安装 docling
 - 🌐 **中英文界面**：设置页一键切换，即时生效；首次启动跟随系统语言
 - 🔄 **检查更新**：设置页一键查询 GitHub Releases 最新版本
+- 📦 **模型内置、完全离线**：v0.5.0 起安装包内置 PDF/图片管线模型（布局 + 表格），开箱即用无需联网；其他管线按需下载且 HF 不可达时自动切换镜像源
 - 📤 **五种输出**：Markdown / HTML / JSON（DoclingDocument 无损）/ DocTags XML / 纯文本
 - 🖼️ **图片导出**：md/html/json 输出时内嵌图片自动导出到 `<名称>_images/`，相对链接引用
 - ⏸️ **可中断**：后台线程运行，随时停止；默认跳过已存在的输出，可断点续转
@@ -132,8 +133,15 @@ A：docling 是 IBM 开源的文档解析引擎（Python 库 / CLI）；Docling 
 A：不需要。从 Releases 下载压缩包，解压即用。源码运行才需要 Python 3.10+。
 
 **Q：文档会被上传到云端吗？**
-A：不会。所有解析都在本地完成；仅首次使用时联网下载 docling 模型（缓存于
-`~/.cache/docling`），之后可完全离线使用。
+A：不会。所有解析都在本地完成。v0.5.0 起安装包内置 PDF/图片管线模型，这类转换开箱即用、
+完全离线；其余格式（如音频）首次使用时联网下载模型（缓存于 `~/.cache/huggingface`），
+且 huggingface.co 不可达时自动切换 hf-mirror.com 镜像，之后可完全离线使用。
+
+**Q：模型可以单独下载吗？**
+A：可以。从 Release 下载 `docling-models.zip`（或自用 `huggingface_hub` 下载
+`docling-project/docling-layout-heron` 与 `docling-project/docling-models` 的
+tableformer 部分），解压后设置环境变量 `DOCLING_ARTIFACTS_PATH` 指向该目录即可；
+不设置则使用安装包内置模型。
 
 **Q：如何批量把 PDF 转成 Markdown 导入 Obsidian？**
 A：选择 PDF 所在文件夹 → 输出格式选 Markdown → 可指定输出目录（按原目录结构镜像）→

@@ -48,12 +48,40 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0
+          # libglib/libgssapi 是 PyInstaller 收集 qfluentwidgets 与 Qt hook
+          # 导入 PySide6.QtNetwork 的构建期依赖；其余为 Qt 运行时常见依赖
+          sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0 \
+            libglib2.0-0 libgssapi-krb5-2 libfontconfig1 libdbus-1-3 libgl1 \
+            || sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0 \
+            libglib2.0-0t64 libgssapi-krb5-2 libfontconfig1 libdbus-1-3 libgl1
+
+      # 下载 PDF/图片管线默认模型（布局 docling-layout-heron + 表格 tableformer
+      # + OCR rapidocr），打进产物实现离线转换。目录布局必须符合 docling 约定：
+      # HF 仓库按 repo_id.replace('/', '--')，rapidocr 由 docling-tools 落到 RapidOcr/
+      - name: Download docling models (bundled for offline use)
+        run: |
+          python - <<'EOF'
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              "docling-project/docling-layout-heron",
+              local_dir="models/docling-project--docling-layout-heron",
+              ignore_patterns=[".cache/**"],
+          )
+          snapshot_download(
+              "docling-project/docling-models",
+              local_dir="models/docling-project--docling-models",
+              allow_patterns=["model_artifacts/tableformer/**"],
+              ignore_patterns=[".cache/**"],
+          )
+          print("models ready")
+          EOF
+          docling-tools models download rapidocr --rapidocr-backend-lang torch:ch -o models
+          ls models/RapidOcr
 
       - name: Build
         run: pyinstaller docling-gui.spec --noconfirm
 
-      - name: "Smoke test (headless: --version + real conversion)"
+      - name: "Smoke test (full format matrix, offline via bundled models)"
         shell: bash
         env:
           PYTHONIOENCODING: utf-8
@@ -66,12 +94,21 @@ jobs:
             BIN=dist/docling-gui/docling-gui
           fi
           "$BIN" --version
-          python tests/make_sample.py tests/_sandbox/sample.docx
-          "$BIN" --cli tests/_sandbox
-          test -f tests/_sandbox/sample.md
-          "$BIN" --cli --out tests/_sandbox/out2 tests/_sandbox/sample.docx
-          test -f tests/_sandbox/out2/sample.md
-          echo "SMOKE OK: $BIN"
+          pip install reportlab
+          python tests/gen_samples.py tests/_samples
+          "$BIN" --cli tests/_samples --out tests/_samples_out
+          fail=0
+          for stem in pdf docx pptx xlsx csv html adoc epub eml ics vtt tex jats png; do
+            if [ ! -f "tests/_samples_out/$stem.md" ]; then
+              echo "MISSING OUTPUT: $stem.md"
+              fail=1
+            fi
+          done
+          if [ "$fail" = "1" ]; then
+            echo "SMOKE FAILED: $BIN"
+            exit 1
+          fi
+          echo "SMOKE OK: $BIN (14 formats converted)"
 
       - name: Zip artifact
         shell: bash
@@ -88,9 +125,23 @@ jobs:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}.zip
 
+      # 模型单独打包上传（只跑一次，避免重名冲突）：供不想用内置模型的用户，
+      # 解压后设 DOCLING_ARTIFACTS_PATH 指向解压目录即可
+      - name: Zip models package
+        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest'
+        run: |
+          zip -qry docling-models.zip models -x "models/*/.cache/*"
+          du -sh docling-models.zip
+
       - name: Create Release and upload
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.asset }}.zip
           generate_release_notes: true
+
+      - name: Upload models package to Release
+        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: docling-models.zip

@@ -33,6 +33,7 @@ into Markdown / HTML / JSON / DocTags / plain text**. Windows / macOS / Linux.
 - ✅ **Input format checkboxes**: 37 input formats (incl. legacy Office, audio, email — full docling capability), discovered dynamically from the installed docling
 - 🌐 **Chinese / English UI**: one click in Settings, applied instantly; first launch follows the system locale
 - 🔄 **Update check**: query the latest GitHub release from the Settings page
+- 📦 **Bundled models, fully offline**: since v0.5.0 the package ships the PDF/image pipeline models (layout + tableformer) — convert out of the box without internet; other pipelines download on demand and automatically fall back to a mirror when huggingface.co is unreachable
 - 📤 **Five output formats**: Markdown / HTML / JSON (lossless DoclingDocument) / DocTags XML / plain text
 - 🖼️ **Image export**: embedded images go to `<name>_images/` with relative links (md/html/json)
 - ⏸️ **Interruptible**: runs in a background thread; existing outputs are skipped by default (resume-friendly)
@@ -121,8 +122,15 @@ prebuilt packages for three platforms.
 A: No. Download a package from Releases, unzip and run. Only a source checkout needs Python 3.10+.
 
 **Q: Are my documents uploaded to the cloud?**
-A: No. All parsing runs locally. docling models are downloaded once on first use (cached in
-`~/.cache/docling`); after that the app works fully offline.
+A: No. All parsing runs locally. Since v0.5.0 the PDF/image pipeline models ship inside the package —
+those conversions are fully offline out of the box. Other pipelines (e.g. audio) download models once
+on first use (cached in `~/.cache/huggingface`) and automatically switch to the hf-mirror.com endpoint
+when huggingface.co is unreachable; after that the app works fully offline.
+
+**Q: Can I download the models separately?**
+A: Yes. Grab `docling-models.zip` from a Release, extract it anywhere and point the
+`DOCLING_ARTIFACTS_PATH` environment variable at the extracted folder. Without it the app uses the
+bundled models.
 
 **Q: How do I batch-convert PDFs to Markdown for Obsidian?**
 A: Pick the folder containing the PDFs → output format Markdown → optional output directory
